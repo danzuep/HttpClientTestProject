@@ -7,6 +7,7 @@ using Polly.Extensions.Http;
 
 namespace HttpClientTestProject;
 
+[TestFixture]
 public class HttpClientPollyUnitTests
 {
     private static readonly string TestClient = "TestClient";
@@ -25,9 +26,23 @@ public class HttpClientPollyUnitTests
         var response = await retryPolicy.ExecuteAsync(() => httpClient.GetAsync(TestUrl));
 
         // Assert / Check
-        Assert.NotNull(response);
-        Assert.True(retryCalled);
+        Assert.That(response, Is.Not.Null);
+        Assert.That(retryCalled, Is.True);
         Assert.That(response.StatusCode, Is.EqualTo(httpStatusCodeHandledByPolicy));
+    }
+
+    [TestCase(HttpStatusCode.ServiceUnavailable)]
+    public async Task HttpGet_WithStatusRetryPolicy_CheckRetryStatus(HttpStatusCode retryCode)
+    {
+        // Arrange / With
+        var httpClient = HttpClientHelper.CreateStubOkAfterRetryClient(retryCode);
+
+        // Act
+        var response = await httpClient.GetAsync(TestUrl);
+
+        // Assert / Check
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.StatusCode, Is.EqualTo(retryCode));
     }
 
     [Test]
@@ -44,8 +59,38 @@ public class HttpClientPollyUnitTests
         var response = await retryPolicy.ExecuteAsync(() => httpClient.GetAsync(TestUrl));
 
         // Assert / Check
-        Assert.NotNull(response);
-        Assert.True(retryCalled);
+        Assert.That(response, Is.Not.Null);
+        Assert.That(retryCalled, Is.True);
+        Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
+    }
+
+    [Test]
+    public void HttpGet_WithExceptionRetryPolicy_CheckThrow()
+    {
+        // Arrange / With
+        var httpMessageHandler = HttpClientHelper.CreateThrowHandler();
+        var httpClient = HttpClientHelper.CreateHttpClient(httpMessageHandler);
+
+        // Act & Assert / Check
+        Assert.ThrowsAsync<HttpRequestException>(() => httpClient.GetAsync(TestUrl));
+    }
+
+    [Test]
+    public async Task HttpGet_WithExceptionRetryPolicy_CheckRetryStatusOk()
+    {
+        // Arrange / With
+        int retryCount = 1;
+        bool retryCalled = false;
+        var retryPolicy = Policy.HandleResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)
+            .RetryAsync(retryCount, onRetry: (_, __) => retryCalled = true);
+        var httpClient = HttpClientHelper.CreateStubThrowRetryClient(failCount: retryCount);
+
+        // Act
+        var response = await retryPolicy.ExecuteAsync(() => httpClient.GetAsync(TestUrl));
+
+        // Assert / Check
+        Assert.That(response, Is.Not.Null);
+        Assert.That(retryCalled, Is.True);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
     }
 
@@ -63,8 +108,8 @@ public class HttpClientPollyUnitTests
         var response = await retryPolicy.ExecuteAsync(() => httpClient.GetAsync(TestUrl));
 
         // Assert / Check
-        Assert.NotNull(response);
-        Assert.True(retryCalled);
+        Assert.That(response, Is.Not.Null);
+        Assert.That(retryCalled, Is.True);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
     }
 
@@ -110,7 +155,7 @@ public class HttpClientPollyUnitTests
         stopwatch.Stop();
 
         // Assert / Check
-        Assert.NotNull(response);
+        Assert.That(response, Is.Not.Null);
         Assert.That(response.StatusCode, Is.EqualTo(HttpStatusCode.OK));
         Assert.That(retriesAttempted, Is.EqualTo(numberOfExecutions + retryCount));
     }

@@ -2,17 +2,14 @@
 
 namespace HttpClientTestProject
 {
-    internal class StubOkAfterRetryDelegatingHandler : DelegatingHandler
+    internal class StubOkAfterThrowDelegatingHandler : DelegatingHandler
     {
         private int _count = 0;
 
         private readonly int _failCount;
 
-        private readonly HttpStatusCode _failureCode;
-
-        public StubOkAfterRetryDelegatingHandler(HttpStatusCode failureCode = HttpStatusCode.InternalServerError, int failCount = 1)
+        public StubOkAfterThrowDelegatingHandler(int failCount = 1)
         {
-            _failureCode = failureCode;
             _failCount = failCount;
         }
 
@@ -20,7 +17,7 @@ namespace HttpClientTestProject
         {
             var status = _count++ >= _failCount ?
                 HttpStatusCode.OK :
-                _failureCode;
+                throw new HttpRequestException();
             var response = new HttpResponseMessage(status);
             return Task.FromResult(response);
         }

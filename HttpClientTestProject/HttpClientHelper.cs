@@ -1,7 +1,6 @@
-﻿using FakeItEasy;
-using System.Net;
-using System.Reflection;
+﻿using System.Net;
 using System.Text.Json;
+using FakeItEasy;
 
 namespace HttpClientTestProject;
 
@@ -29,6 +28,21 @@ internal static class HttpClientHelper
         return messageHandler;
     }
 
+    public static HttpMessageHandler CreateThrowHandler(Exception? exception = null)
+    {
+        exception ??= new HttpRequestException();
+        var messageHandler = A.Fake<HttpMessageHandler>();
+        A.CallTo(messageHandler)
+            .Where(call => call.Method.Name == "Send")
+            .WithReturnType<HttpResponseMessage>()
+            .Throws(exception);
+        A.CallTo(messageHandler)
+            .Where(call => call.Method.Name == "SendAsync")
+            .WithReturnType<Task<HttpResponseMessage>>()
+            .Throws(exception);
+        return messageHandler;
+    }
+
     public static HttpClient CreateHttpClient(HttpMessageHandler httpMessageHandler, string? baseUrl = null)
     {
         var httpClient = new HttpClient(httpMessageHandler)
@@ -45,9 +59,17 @@ internal static class HttpClientHelper
         return httpClient;
     }
 
-    public static HttpClient CreateStubOkAfterRetryClient(int failCount = 1, string? baseUrl = null)
+    public static HttpClient CreateStubOkAfterRetryClient(HttpStatusCode failCode = HttpStatusCode.InternalServerError, int failCount = 1, string? baseUrl = null)
     {
-        var stubHttpMessageHandler = new StubOkAfterRetryDelegatingHandler(failCount);
+        var stubHttpMessageHandler = new StubOkAfterRetryDelegatingHandler(failCode, failCount);
+        var httpClient = CreateHttpClient(stubHttpMessageHandler, baseUrl);
+        return httpClient;
+    }
+
+    public static HttpClient CreateStubThrowRetryClient(int failCount = 1, string? baseUrl = null)
+    {
+        var stubHttpMessageHandler = new StubOkAfterRetryDelegatingHandler(failCount: failCount);
+        stubHttpMessageHandler.InnerHandler = CreateThrowHandler();
         var httpClient = CreateHttpClient(stubHttpMessageHandler, baseUrl);
         return httpClient;
     }
